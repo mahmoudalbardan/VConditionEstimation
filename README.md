@@ -33,22 +33,25 @@ pip install -r requirements.txt
 ##  Launch and test the app on your Local Machine
 To train the model locally, use the data already stored in Google Cloud Storage
 by following these steps:
+1. Create a directory called `data` that will host data files
 
-1. Run the training script:
-```bash
-python src/scripts/train_model.py --configuration configuration.ini --retrain false
-```
-The model will be automaticaly saved in: `src/model/fraud_detection_model.pkl`
+2. Copy the three files `FS1.txt`, `PS2.txt` and `profile.txt` to a repository `data`
 
-2. Build docker image:
+3. Run the training script:
 ```bash
-docker build -t fraudapp .
+python src/scripts/build_evaluate_model.py --configuration configuration.ini --eda false
 ```
-3.  Run docker container:
+The model will be automaticaly saved in: `src/model/model.pkl`
+
+4. Build docker image:
 ```bash
-docker run -p 5000:5000 fraudapp
+docker build -t valveapp .
 ```
-4. Test the app by running the following script:
+5. Run docker container:
+```bash
+docker run -p 5000:5000 valveapp
+```
+6. Test the app by running the following script:
 ```bash
 python experimental/testing_the_app.py
 ```
