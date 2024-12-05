@@ -37,21 +37,28 @@ by following these steps:
 
 2. Copy the three files `FS1.txt`, `PS2.txt` and `profile.txt` to a repository `data`
 
-3. Run the training script:
+3. Run some unit testing
+```bash
+python -m unittest discover -s src/scripts/tests
+```
+
+4. Run the training script:
 ```bash
 python src/scripts/build_evaluate_model.py --configuration configuration.ini --eda false
 ```
 The model will be automaticaly saved in: `src/model/model.pkl`
 
-4. Build docker image:
+5. Build docker image:
 ```bash
 docker build -t valveapp .
 ```
-5. Run docker container:
+
+6. Run docker container:
 ```bash
 docker run -p 5000:5000 valveapp
 ```
-6. Test the app by running the following script:
+
+7. Test the app by running the following script:
 ```bash
 python experimental/testing_the_app.py
 ```
