@@ -12,7 +12,6 @@ We extracted various time-based features from the sensor data of each cycle, foc
 
 
 ## Repository Structure
-- `.github/workflows/`: GitHub actions workflows for CI/CD and MLOps
 - `experimental/`: Contains script to test the prediction flask app
 - `src/`: Contains Python scripts for data processing, training, and monitoring.
 - `tests/`: Contains scripts for unit testing.
@@ -55,7 +54,7 @@ docker build -t valveapp .
 
 6. Run docker container:
 ```bash
-docker run -p 5000:5000 valveapp
+docker run -p 8080:8080 valveapp
 ```
 
 7. Test the app by running the following script:

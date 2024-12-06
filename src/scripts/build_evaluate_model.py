@@ -1,20 +1,19 @@
-import json
-import joblib
 import argparse
 import configparser
+import json
+
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.signal import find_peaks
-from sklearn.ensemble import IsolationForest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
 
 sns.set_theme(style="whitegrid")
-
 
 
 def parse_args():
@@ -30,15 +29,14 @@ def parse_args():
         A Namespace object containing the parsed command line arguments.
         - configuration : str
             Path to the configuration file (default: 'configuration.ini').
-        - retrain : str
-            Flag indicating whether to retrain the model ('true' or 'false'; default: 'false').
+        - eda : str
+            Flag indicating whether to do exploratory data analysis (plot histograms) ('true' or 'false'; default: 'false').
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--configuration", type=str,
                         help='configuration file', default='configuration.ini')
     parser.add_argument("--eda", type=str,
-                        help='true or false: true corresponds to a retraining '
-                             'of the model after performance degradation and false corresponds to the first train',
+                        help='true or false: true corresponds to a EDA ',
                         default='false')
 
     args = parser.parse_args()
@@ -69,29 +67,64 @@ def get_config(configfile):
 
 def read_file(config):
     """
-    Read a CSV file from GCP storage bucket.
-    This function connects to Google Cloud Storage, extract the specified CSV file,
-    "credictcard.csv" and loads it into a Pandas DataFrame.
+    Read a files
 
     Parameters
     ----------
-    gcs_bucket_name : str
-        The name of the Google Cloud Storage bucket.
-    gcs_filename : str
-        The name of the file within the bucket.
+    config : configparser.ConfigParser
+        A ConfigParser object containing the configuration settings
+        loaded from the specified file.
 
     Returns
     -------
     pd.DataFrame
-        The contents of "credictcard.csv".
+        The contents of three files in three dataframes
     """
-    data_fs1 = pd.read_csv(config["FILES"]["FS"], sep="\t",header=None)
-    data_ps2 = pd.read_csv(config["FILES"]["PS"], sep="\t",header=None)
-    data_profile = pd.read_csv(config["FILES"]["PROFILE"],sep="\t", header=None)
+    data_fs1 = pd.read_csv(config["FILES"]["FS"], sep="\t", header=None)
+    data_ps2 = pd.read_csv(config["FILES"]["PS"], sep="\t", header=None)
+    data_profile = pd.read_csv(config["FILES"]["PROFILE"], sep="\t", header=None)
     return data_fs1, data_ps2, data_profile
 
 
 def compute_features_one_cycle(cycle_data_fs1, cycle_data_ps2):
+    """
+    Compute statistical features for two sets of cycle data (FS1 and PS2) from a hydraulic system cycle.
+
+    This function computes several descriptive statistics for each of the input cycle data (FS1 and PS2),
+    including mean, max, min, standard deviation, percentiles (25th, 50th, 75th),
+    as well as the count of peaks and troughs in each dataset.
+
+    Parameters:
+    ----------
+    cycle_data_fs1 (array-like): A numeric array or list containing the FS1 cycle data.
+    cycle_data_ps2 (array-like): A numeric array or list containing the PS2 cycle data.
+
+    Returns:
+    ----------
+    dict: A dictionary containing the following statistical features:
+        - 'FS1_mean': Mean of FS1 cycle data
+        - 'FS1_max': Maximum value of FS1 cycle data
+        - 'FS1_min': Minimum value of FS1 cycle data
+        - 'FS1_std': Standard deviation of FS1 cycle data
+        - 'FS1_25th': 25th percentile of FS1 cycle data
+        - 'FS1_50th': 50th percentile (median) of FS1 cycle data
+        - 'FS1_75th': 75th percentile of FS1 cycle data
+        - 'PS2_mean': Mean of PS2 cycle data
+        - 'PS2_max': Maximum value of PS2 cycle data
+        - 'PS2_min': Minimum value of PS2 cycle data
+        - 'PS2_std': Standard deviation of PS2 cycle data
+        - 'PS2_25th': 25th percentile of PS2 cycle data
+        - 'PS2_50th': 50th percentile (median) of PS2 cycle data
+        - 'PS2_75th': 75th percentile of PS2 cycle data
+        - 'FS1_peak_count': Number of peaks in FS1 cycle data
+        - 'FS1_trough_count': Number of troughs in FS1 cycle data
+        - 'PS2_peak_count': Number of peaks in PS2 cycle data
+        - 'PS2_trough_count': Number of troughs in PS2 cycle data
+
+    Notes:
+    - The function uses `find_peaks` from scipy to detect peaks and troughs in the cycle data.
+    - The input cycle data should be numeric arrays or lists.
+    """
     features = {}
 
     # FS1
@@ -138,6 +171,33 @@ def compute_features(data_fs1, data_ps2):
 
 
 def process_data(data_fs1, data_ps2, data_profile):
+    """
+    Process the cycle data to compute features, prepare the target variable, and split the data into training and testing sets.
+
+    Parameters
+    ----------
+    data_fs1 : array-like
+        A numeric array or list containing the FS1 cycle data.
+    data_ps2 : array-like
+        A numeric array or list containing the PS2 cycle data.
+    data_profile : array-like or DataFrame
+        A dataset containing the target variable, with the target values in the second column.
+
+    Returns
+    -------
+    tuple
+        A tuple containing two pandas DataFrames:
+        - data_train : DataFrame
+            The training dataset with features and binary target variable.
+        - data_test : DataFrame
+            The testing dataset with features and binary target variable.
+
+    Notes
+    -----
+    - The function assumes `data_profile[1]` contains the target values, which are used to classify the target as 1 for '100' and 0 otherwise.
+    - The dataset is split into training and testing sets with the first 2000 rows for training and the rest for testing.
+    """
+
     df_features = compute_features(data_fs1, data_ps2)
     df_target = pd.DataFrame(data_profile[1])
     df_target.columns = ["target"]
@@ -213,20 +273,33 @@ def transform_data(data):
 
 def fit_validate_model(data_transformed):
     """
-    Fit an Isolation Forest model to the transformed data.
-    This function preprocesses the feature data by scaling it using
-    StandardScaler, then fits an Isolation Forest model.
+    Fit and validate a Random Forest classifier model using the transformed data.
+
+    This function preprocesses the feature data by scaling it with StandardScaler,
+    then fits a Random Forest classifier. It performs hyperparameter tuning using
+    GridSearchCV and returns the best model, the scaler, and the best cross-validation score.
 
     Parameters
     ----------
     data_transformed : pd.DataFrame
         The transformed input data containing features and the target variable.
+        The target variable should be in the column named 'target'.
 
     Returns
     -------
-    IsolationForest
-        The fitted Isolation Forest model.
+    best_model : RandomForestClassifier
+        The fitted Random Forest model with the best hyperparameters based on GridSearchCV.
+    scaler : StandardScaler
+        The StandardScaler object used to scale the features.
+    best_score : float
+        The best cross-validation score obtained during the hyperparameter tuning.
+
+    Notes
+    -----
+    - This function uses `GridSearchCV` to perform hyperparameter tuning on the Random Forest model.
+    - The hyperparameters being tuned are `n_estimators` and `max_depth`.
     """
+
     X = data_transformed.drop(columns=['target'])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -266,16 +339,28 @@ def evaluate_model(model, scaler, features_to_log, data_test):
 
 def save_outputs(config, model, dict_metrics):
     """
-    Save the trained model to a specified file path.
-    This function uses joblib to save the fitted model.
+    Save the trained model and performance metrics to specified file paths.
+
+    This function saves the fitted model using `joblib` and the performance metrics
+    to a JSON file. The file paths for saving the model and metrics are retrieved
+    from the provided configuration.
 
     Parameters
     ----------
-    model : IsolationForest
-        The fitted Isolation Forest model.
+    config : dict
+        A dictionary containing file paths for saving the model and metrics.
+        It should contain keys `"FILES"`, with `"MODEL_PATH"` for the model and `"METRICS_PATH"` for the metrics.
 
-    model_path : str
-        The model file path it will be saved.
+    model : object
+        The trained model to be saved, random forest classifier
+
+    dict_metrics : dict
+        A dictionary containing the performance metrics to be saved in JSON format.
+
+    Notes
+    -----
+    - The model is saved using `joblib.dump()`.
+    - The metrics are saved in a JSON format using `json.dump()`, with an indentation level of 4.
     """
     joblib.dump(model, config["FILES"]["MODEL_PATH"])
     with open(config["FILES"]["METRICS_PATH"], "w") as json_file:
