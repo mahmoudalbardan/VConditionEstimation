@@ -24,7 +24,7 @@ We extracted various time-based features from the sensor data of each cycle, foc
 ### Install Dependencies
 Clone the repository and install dependencies:
 ```bash
-git clone https://github.com/mahmoudalbardan/test_vif.git
+git clone https://github.com/mahmoudalbardan/VConditionEstimation.git 
 cd test_vif
 pip install -r requirements.txt
 ```
